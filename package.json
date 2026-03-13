@@ -1,0 +1,29 @@
+{
+  "name": "pharma-crm",
+  "version": "1.0.0",
+  "description": "Medical Representative DCR CRM System — Netlify Serverless + GitHub",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Static frontend — no build step required'",
+    "dev": "netlify dev",
+    "deploy": "netlify deploy --prod",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^2.8.1",
+    "typescript": "^5.4.5",
+    "netlify-cli": "^17.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "pharma-crm",
+    "medical-representative",
+    "dcr",
+    "netlify",
+    "serverless"
+  ],
+  "author": "PharmaCRM Team",
+  "license": "MIT"
+}
