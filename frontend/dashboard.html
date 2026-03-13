@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0b6e6e">
+  <title>Dashboard — Pharma CRM</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="nav" id="topNav"></nav>
+
+  <main class="page">
+    <div class="container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2 id="greetingText">Good Morning 👋</h2>
+          <p id="userNameSub">Loading...</p>
+        </div>
+        <div>
+          <span id="todayDate" class="text-muted text-sm"></span>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card teal">
+          <div class="stat-icon">👨‍⚕️</div>
+          <div class="stat-value" id="stat-doctors">—</div>
+          <div class="stat-label">Total Doctors</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-icon">📋</div>
+          <div class="stat-value" id="stat-today">—</div>
+          <div class="stat-label">Today's Visits</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon">📈</div>
+          <div class="stat-value" id="stat-coverage">—</div>
+          <div class="stat-label">Coverage %</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-icon">💊</div>
+          <div class="stat-value" id="stat-rx">—</div>
+          <div class="stat-label">Rx This Month</div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="section-title">Quick Actions</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+        <a href="/visits.html?new=1" class="btn btn-primary" style="justify-content:flex-start">
+          ➕ New DCR
+        </a>
+        <a href="/doctors.html?new=1" class="btn btn-accent" style="justify-content:flex-start">
+          👤 Add Doctor
+        </a>
+        <a href="/planner.html" class="btn btn-outline" style="justify-content:flex-start">
+          📅 View Planner
+        </a>
+        <a href="/reports.html" class="btn btn-outline" style="justify-content:flex-start">
+          📊 Reports
+        </a>
+      </div>
+
+      <!-- Plan Progress -->
+      <div class="section-title">Monthly Plan Progress</div>
+      <div class="card mb-4" id="planCard">
+        <div class="card-header">
+          <span class="card-title" id="planMonth">March 2025</span>
+          <span class="badge badge-primary" id="planStatus">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span class="text-sm text-muted">Completed: <strong id="planCompleted">—</strong></span>
+          <span class="text-sm text-muted">Planned: <strong id="planTotal">—</strong></span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="planProgress" style="width:0%"></div>
+        </div>
+        <div style="text-align:right;font-size:12px;color:var(--primary);font-weight:700;margin-top:6px" id="planPercent">0%</div>
+      </div>
+
+      <!-- 7-Day Visit Trend -->
+      <div class="section-title">7-Day Visit Trend</div>
+      <div class="card mb-4">
+        <div id="trendChart" style="display:flex;align-items:flex-end;gap:6px;height:80px;padding:0 4px"></div>
+        <div id="trendLabels" style="display:flex;gap:6px;margin-top:6px;padding:0 4px"></div>
+      </div>
+
+      <!-- Recent Visits -->
+      <div class="section-title">Recent Visits</div>
+      <div class="card" id="recentVisits">
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <p>No recent visits</p>
+        </div>
+      </div>
+
+      <div style="height:24px"></div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" id="bottomNav"></nav>
+
+  <script src="/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      renderNav('dashboard');
+
+      const user = Auth.user;
+      const hour = new Date().getHours();
+      const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+      document.getElementById('greetingText').textContent = `${greeting} 👋`;
+      document.getElementById('userNameSub').textContent = `${user.name} • ${user.territory}`;
+      document.getElementById('todayDate').textContent = Format.date(new Date().toISOString().split('T')[0]);
+
+      try {
+        const res = await apiCall(`/dashboard?mrId=${user.id}`);
+        const d = res.data;
+
+        document.getElementById('stat-doctors').textContent = d.totalDoctors;
+        document.getElementById('stat-today').textContent = d.todayVisits;
+        document.getElementById('stat-coverage').textContent = d.coverage + '%';
+        document.getElementById('stat-rx').textContent = d.totalRxMonth;
+
+        // Plan progress
+        if (d.currentPlan) {
+          document.getElementById('planMonth').textContent = Format.monthName(new Date().toISOString().slice(0,7));
+          document.getElementById('planStatus').textContent = d.currentPlan.status;
+          document.getElementById('planCompleted').textContent = d.currentPlan.totalCompleted;
+          document.getElementById('planTotal').textContent = d.currentPlan.totalPlanned;
+          document.getElementById('planProgress').style.width = d.currentPlan.achievementPercent + '%';
+          document.getElementById('planPercent').textContent = d.currentPlan.achievementPercent + '%';
+        } else {
+          document.getElementById('planCard').innerHTML = `<div class="empty-state" style="padding:24px">
+            <div class="empty-icon">📅</div><p>No plan for this month</p>
+            <a href="/planner.html" class="btn btn-primary btn-sm">Create Plan</a>
+          </div>`;
+        }
+
+        // 7-day trend chart
+        if (d.last7Days && d.last7Days.length) {
+          const max = Math.max(...d.last7Days.map(x => x.count)) || 1;
+          const trendChart = document.getElementById('trendChart');
+          const trendLabels = document.getElementById('trendLabels');
+          const today = new Date().toISOString().split('T')[0];
+
+          trendChart.innerHTML = d.last7Days.map(day => {
+            const pct = Math.max((day.count / max) * 100, day.count > 0 ? 8 : 3);
+            const isToday = day.date === today;
+            return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+              <span style="font-size:11px;font-weight:700;color:${isToday ? 'var(--primary)' : 'var(--text-muted)'}">${day.count}</span>
+              <div style="width:100%;height:${pct}%;background:${isToday ? 'var(--primary)' : 'var(--primary-light)'};border-radius:4px 4px 0 0;min-height:4px;transition:height 0.6s ease"></div>
+            </div>`;
+          }).join('');
+
+          trendLabels.innerHTML = d.last7Days.map((day, i) => {
+            const d2 = new Date(day.date);
+            const days = ['S','M','T','W','T','F','S'];
+            return `<span style="flex:1;text-align:center;font-size:10px;color:var(--text-muted)">${days[d2.getDay()]}</span>`;
+          }).join('');
+        }
+
+        // Recent visits
+        if (d.recentVisits && d.recentVisits.length) {
+          document.getElementById('recentVisits').innerHTML = d.recentVisits.map(v => `
+            <div class="list-item" onclick="window.location='/visits.html'">
+              <div class="item-avatar">${Format.initials(v.doctorName)}</div>
+              <div class="item-body">
+                <div class="item-title">${v.doctorName}</div>
+                <div class="item-subtitle">📅 ${Format.date(v.visitDate)} • ${v.productsDetailed?.length || 0} products</div>
+              </div>
+              <div class="item-meta">
+                <span class="badge ${v.rxGenerated ? 'badge-success' : 'badge-muted'}">${v.rxGenerated ? `Rx×${v.rxCount}` : 'No Rx'}</span>
+              </div>
+            </div>
+          `).join('');
+        }
+
+      } catch (err) {
+        Toast.error('Failed to load dashboard data');
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0b6e6e">
+  <title>Products — Pharma CRM</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="nav" id="topNav"></nav>
+
+  <main class="page">
+    <div class="container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Product Master</h2>
+          <p id="prodCount">Loading...</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openAddProduct()">➕ Add</button>
+      </div>
+
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="form-control" id="searchInput" placeholder="Search products..." oninput="filterProducts()">
+      </div>
+
+      <div class="filter-chips" id="filterChips">
+        <span class="chip active" data-filter="all" onclick="setFilter('all',this)">All</span>
+        <span class="chip" data-filter="Cardiology" onclick="setFilter('Cardiology',this)">❤️ Cardiology</span>
+        <span class="chip" data-filter="Diabetology" onclick="setFilter('Diabetology',this)">🩸 Diabetology</span>
+        <span class="chip" data-filter="Neurology" onclick="setFilter('Neurology',this)">🧠 Neurology</span>
+        <span class="chip" data-filter="Orthopaedics" onclick="setFilter('Orthopaedics',this)">🦴 Ortho</span>
+        <span class="chip" data-filter="Paediatrics" onclick="setFilter('Paediatrics',this)">👶 Paediatrics</span>
+      </div>
+
+      <div id="productList">
+        <div class="empty-state"><div class="empty-icon">💊</div><p>Loading products...</p></div>
+      </div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" id="bottomNav"></nav>
+
+  <!-- Product Detail Modal -->
+  <div class="modal-overlay" id="productDetailModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <span class="modal-title">Product Details</span>
+        <button class="modal-close" onclick="Modal.close('productDetailModal')">✕</button>
+      </div>
+      <div class="modal-body" id="productDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Product Modal -->
+  <div class="modal-overlay" id="productModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <span class="modal-title" id="prodModalTitle">Add Product</span>
+        <button class="modal-close" onclick="Modal.close('productModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="productForm">
+          <input type="hidden" id="productId">
+          <div class="form-group">
+            <label class="form-label">Brand Name *</label>
+            <input type="text" class="form-control" id="prodName" placeholder="e.g. CardioMax 5mg" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Generic Name</label>
+            <input type="text" class="form-control" id="prodGeneric" placeholder="e.g. Amlodipine">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Category</label>
+              <input type="text" class="form-control" id="prodCategory" placeholder="e.g. Antihypertensive">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Division</label>
+              <select class="form-control" id="prodDivision">
+                <option value="">Select...</option>
+                <option>Cardiology</option>
+                <option>Diabetology</option>
+                <option>Neurology</option>
+                <option>Orthopaedics</option>
+                <option>Paediatrics</option>
+                <option>General</option>
+                <option>Dermatology</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">MRP (₹)</label>
+              <input type="number" class="form-control" id="prodMRP" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Packing</label>
+              <input type="text" class="form-control" id="prodPacking" placeholder="e.g. 10 Tab Strip">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" id="prodDesc" rows="2" placeholder="Brief product description"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Indications (comma-separated)</label>
+            <input type="text" class="form-control" id="prodIndications" placeholder="e.g. Hypertension, Angina">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Key Benefits (comma-separated)</label>
+            <input type="text" class="form-control" id="prodBenefits" placeholder="e.g. Once daily, Well tolerated">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Stock Units</label>
+              <input type="number" class="form-control" id="prodStock" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sample Available?</label>
+              <select class="form-control" id="prodSample">
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="Modal.close('productModal')" style="flex:1">Cancel</button>
+        <button class="btn btn-primary" onclick="saveProduct()" style="flex:2" id="saveProdBtn">Save Product</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    let allProducts = [];
+    let activeFilter = 'all';
+
+    const divColors = {
+      Cardiology: '#fee2e2', Diabetology: '#dbeafe', Neurology: '#ede9fe',
+      Orthopaedics: '#fef3c7', Paediatrics: '#d1fae5', General: '#f3f4f6',
+      Dermatology: '#fce7f3',
+    };
+    const divIcons = {
+      Cardiology: '❤️', Diabetology: '🩸', Neurology: '🧠',
+      Orthopaedics: '🦴', Paediatrics: '👶', General: '💊',
+      Dermatology: '🌿',
+    };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      renderNav('doctors');
+      await loadProducts();
+    });
+
+    async function loadProducts() {
+      try {
+        const res = await apiCall('/products');
+        allProducts = res.data;
+        document.getElementById('prodCount').textContent = `${allProducts.length} products in portfolio`;
+        renderProducts(allProducts);
+      } catch (err) { Toast.error('Failed to load products'); }
+    }
+
+    function setFilter(f, el) {
+      activeFilter = f;
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      filterProducts();
+    }
+
+    function filterProducts() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      let filtered = allProducts;
+      if (activeFilter !== 'all') filtered = filtered.filter(p => p.division === activeFilter);
+      if (q) filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(q) || p.genericName.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q)
+      );
+      renderProducts(filtered);
+    }
+
+    function renderProducts(products) {
+      const list = document.getElementById('productList');
+      if (!products.length) {
+        list.innerHTML = `<div class="empty-state"><div class="empty-icon">💊</div><p>No products found</p></div>`;
+        return;
+      }
+      list.innerHTML = products.map(p => `
+        <div class="product-card slide-up" onclick="showProductDetail('${p.id}')">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="width:48px;height:48px;border-radius:12px;background:${divColors[p.division]||'#f3f4f6'};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
+              ${divIcons[p.division] || '💊'}
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="product-name">${p.name}</div>
+              <div class="product-generic">${p.genericName}</div>
+              <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">
+                <span class="badge badge-info">${p.division}</span>
+                <span class="badge badge-muted">${p.category}</span>
+                ${p.sampleAvailable ? '<span class="badge badge-success">Sample ✓</span>' : ''}
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div class="product-price">${Format.currency(p.mrp)}</div>
+              <div style="font-size:11px;color:var(--text-muted)">${p.packing}</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showProductDetail(id) {
+      const p = allProducts.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('productDetailBody').innerHTML = `
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+          <div style="width:60px;height:60px;border-radius:14px;background:${divColors[p.division]||'#f3f4f6'};display:flex;align-items:center;justify-content:center;font-size:28px">
+            ${divIcons[p.division] || '💊'}
+          </div>
+          <div>
+            <div style="font-size:17px;font-weight:700">${p.name}</div>
+            <div style="font-size:13px;color:var(--text-muted);font-style:italic">${p.genericName}</div>
+            <div class="badge badge-info" style="margin-top:6px">${p.division}</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div style="background:var(--surface2);padding:12px;border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--text-muted)">MRP</div>
+            <div style="font-size:20px;font-weight:700;color:var(--primary)">${Format.currency(p.mrp)}</div>
+          </div>
+          <div style="background:var(--surface2);padding:12px;border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--text-muted)">Packing</div>
+            <div style="font-size:13px;font-weight:600">${p.packing}</div>
+          </div>
+          <div style="background:var(--surface2);padding:12px;border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--text-muted)">Category</div>
+            <div style="font-size:13px;font-weight:600">${p.category}</div>
+          </div>
+          <div style="background:var(--surface2);padding:12px;border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--text-muted)">Samples</div>
+            <div style="font-size:13px;font-weight:600;color:${p.sampleAvailable?'var(--success)':'var(--text-muted)'}">${p.sampleAvailable?'✅ Available':'❌ Not Available'}</div>
+          </div>
+        </div>
+        ${p.description ? `<p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">${p.description}</p>` : ''}
+        ${p.indications?.length ? `
+          <div style="margin-bottom:14px">
+            <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">INDICATIONS</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">${p.indications.map(i => `<span class="badge badge-primary">${i}</span>`).join('')}</div>
+          </div>` : ''}
+        ${p.keyBenefits?.length ? `
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">KEY BENEFITS</div>
+            ${p.keyBenefits.map(b => `<div style="display:flex;gap:8px;font-size:13px;margin-bottom:6px"><span style="color:var(--success)">✓</span><span>${b}</span></div>`).join('')}
+          </div>` : ''}
+      `;
+      Modal.open('productDetailModal');
+    }
+
+    function openAddProduct() {
+      document.getElementById('prodModalTitle').textContent = 'Add Product';
+      document.getElementById('productForm').reset();
+      document.getElementById('productId').value = '';
+      Modal.open('productModal');
+    }
+
+    async function saveProduct() {
+      const id = document.getElementById('productId').value;
+      const btn = document.getElementById('saveProdBtn');
+      const indStr = document.getElementById('prodIndications').value;
+      const benStr = document.getElementById('prodBenefits').value;
+      const payload = {
+        name: document.getElementById('prodName').value.trim(),
+        genericName: document.getElementById('prodGeneric').value.trim(),
+        category: document.getElementById('prodCategory').value.trim(),
+        division: document.getElementById('prodDivision').value,
+        mrp: document.getElementById('prodMRP').value,
+        packing: document.getElementById('prodPacking').value.trim(),
+        description: document.getElementById('prodDesc').value.trim(),
+        indications: indStr ? indStr.split(',').map(s => s.trim()).filter(Boolean) : [],
+        keyBenefits: benStr ? benStr.split(',').map(s => s.trim()).filter(Boolean) : [],
+        stockUnits: document.getElementById('prodStock').value,
+        sampleAvailable: document.getElementById('prodSample').value === 'true',
+      };
+      if (!payload.name) { Toast.error('Product name required'); return; }
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        if (id) {
+          await apiCall('/products', { method: 'PUT', body: JSON.stringify({ id, ...payload }) });
+          Toast.success('Product updated');
+        } else {
+          await apiCall('/products', { method: 'POST', body: JSON.stringify(payload) });
+          Toast.success('Product added');
+        }
+        Modal.close('productModal');
+        await loadProducts();
+      } catch (err) { Toast.error(err.message); }
+      btn.disabled = false; btn.textContent = 'Save Product';
+    }
+  </script>
+</body>
+</html>

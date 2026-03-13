@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0b6e6e">
+  <title>Tour Planner — Pharma CRM</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="nav" id="topNav"></nav>
+
+  <main class="page">
+    <div class="container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Tour Planner</h2>
+          <p id="plannerSub">Monthly schedule</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openCreatePlan()">➕ New Plan</button>
+      </div>
+
+      <!-- Month Selector -->
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+        <button class="btn btn-icon" onclick="changeMonth(-1)">‹</button>
+        <div style="flex:1;text-align:center;font-size:16px;font-weight:700" id="currentMonthLabel">March 2025</div>
+        <button class="btn btn-icon" onclick="changeMonth(1)">›</button>
+      </div>
+
+      <!-- Plan Status Card -->
+      <div class="card mb-4" id="planStatusCard">
+        <div class="empty-state" style="padding:24px">
+          <div class="empty-icon">📅</div>
+          <p>No plan for this month</p>
+          <button class="btn btn-primary btn-sm" onclick="openCreatePlan()">Create Plan</button>
+        </div>
+      </div>
+
+      <!-- Calendar View -->
+      <div class="section-title">Calendar View</div>
+      <div class="card mb-4">
+        <div class="calendar-grid" id="calendarHeader">
+          <div class="cal-day-header">S</div>
+          <div class="cal-day-header">M</div>
+          <div class="cal-day-header">T</div>
+          <div class="cal-day-header">W</div>
+          <div class="cal-day-header">T</div>
+          <div class="cal-day-header">F</div>
+          <div class="cal-day-header">S</div>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+
+      <!-- Planned Visits List -->
+      <div class="section-title">Planned Visits</div>
+      <div id="plannedList">
+        <div class="empty-state"><div class="empty-icon">📅</div><p>No planned visits</p></div>
+      </div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" id="bottomNav"></nav>
+
+  <!-- Create/Edit Plan Modal -->
+  <div class="modal-overlay" id="planModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <span class="modal-title" id="planModalTitle">Create Monthly Plan</span>
+        <button class="modal-close" onclick="Modal.close('planModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Month *</label>
+          <input type="month" class="form-control" id="planMonth">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea class="form-control" id="planNotes" rows="2" placeholder="Objectives for this month..."></textarea>
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:14px;font-weight:700">Planned Visits</div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addVisitRow()">+ Add Visit</button>
+        </div>
+        <div id="visitRows"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="Modal.close('planModal')" style="flex:1">Cancel</button>
+        <button class="btn btn-primary" onclick="savePlan()" style="flex:2" id="savePlanBtn">Save Plan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day Detail Modal -->
+  <div class="modal-overlay" id="dayDetailModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <span class="modal-title" id="dayDetailTitle">Visits for Date</span>
+        <button class="modal-close" onclick="Modal.close('dayDetailModal')">✕</button>
+      </div>
+      <div class="modal-body" id="dayDetailBody"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    let currentMonth = new Date().toISOString().slice(0, 7);
+    let allDoctors = [];
+    let currentPlan = null;
+    let visitRowCount = 0;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      renderNav('planner');
+      updateMonthLabel();
+      await Promise.all([loadDoctors(), loadPlan()]);
+    });
+
+    function updateMonthLabel() {
+      document.getElementById('currentMonthLabel').textContent = Format.monthName(currentMonth);
+      document.getElementById('planMonth').value = currentMonth;
+    }
+
+    function changeMonth(delta) {
+      const [y, m] = currentMonth.split('-').map(Number);
+      const d = new Date(y, m - 1 + delta, 1);
+      currentMonth = d.toISOString().slice(0, 7);
+      updateMonthLabel();
+      loadPlan();
+    }
+
+    async function loadDoctors() {
+      const user = Auth.user;
+      const res = await apiCall(`/doctors?mrId=${user.id}`);
+      allDoctors = res.data;
+    }
+
+    async function loadPlan() {
+      try {
+        const user = Auth.user;
+        const res = await apiCall(`/planner?mrId=${user.id}&month=${currentMonth}`);
+        currentPlan = res.data.length ? res.data[0] : null;
+        renderPlanStatus();
+        renderCalendar();
+        renderPlannedList();
+      } catch (err) {
+        Toast.error('Failed to load planner');
+      }
+    }
+
+    function renderPlanStatus() {
+      const card = document.getElementById('planStatusCard');
+      if (!currentPlan) {
+        card.innerHTML = `<div class="empty-state" style="padding:24px"><div class="empty-icon">📅</div><p>No plan for ${Format.monthName(currentMonth)}</p><button class="btn btn-primary btn-sm" onclick="openCreatePlan()">Create Plan</button></div>`;
+        document.getElementById('plannerSub').textContent = 'No plan this month';
+        return;
+      }
+      const pct = currentPlan.totalPlanned > 0 ? Math.round((currentPlan.totalCompleted / currentPlan.totalPlanned) * 100) : 0;
+      const statusColors = { Draft: 'badge-muted', Submitted: 'badge-warning', Approved: 'badge-success' };
+      card.innerHTML = `
+        <div class="card-header">
+          <span class="card-title">${currentPlan.monthName}</span>
+          <span class="badge ${statusColors[currentPlan.status]||'badge-muted'}">${currentPlan.status}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+          <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--radius-sm)">
+            <div style="font-size:22px;font-weight:700;color:var(--primary)">${currentPlan.totalPlanned}</div>
+            <div style="font-size:11px;color:var(--text-muted)">Planned</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--radius-sm)">
+            <div style="font-size:22px;font-weight:700;color:var(--success)">${currentPlan.totalCompleted}</div>
+            <div style="font-size:11px;color:var(--text-muted)">Completed</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:var(--surface2);border-radius:var(--radius-sm)">
+            <div style="font-size:22px;font-weight:700;color:var(--accent)">${pct}%</div>
+            <div style="font-size:11px;color:var(--text-muted)">Achieved</div>
+          </div>
+        </div>
+        <div class="progress-bar" style="margin-bottom:6px"><div class="progress-fill" style="width:${pct}%"></div></div>
+        ${currentPlan.notes ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:10px">📝 ${currentPlan.notes}</div>` : ''}
+        <div style="display:flex;gap:8px;margin-top:14px">
+          ${currentPlan.status === 'Draft' ? `<button class="btn btn-secondary btn-sm" onclick="submitPlan()">📤 Submit for Approval</button>` : ''}
+          <button class="btn btn-outline btn-sm" onclick="editPlan()">✏️ Edit</button>
+        </div>
+      `;
+      document.getElementById('plannerSub').textContent = `${currentPlan.totalPlanned} visits planned`;
+    }
+
+    function renderCalendar() {
+      const [y, m] = currentMonth.split('-').map(Number);
+      const firstDay = new Date(y, m - 1, 1).getDay();
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const today = new Date().toISOString().split('T')[0];
+
+      // Build set of dates with planned visits
+      const visitDates = new Set();
+      if (currentPlan) currentPlan.plannedVisits.forEach(v => visitDates.add(v.date));
+
+      let html = '';
+      // Empty cells before first day
+      for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>';
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${currentMonth}-${String(day).padStart(2, '0')}`;
+        const isToday = dateStr === today;
+        const hasVisit = visitDates.has(dateStr);
+        const cls = isToday ? 'today' : hasVisit ? 'has-visit' : '';
+        html += `<div class="cal-day ${cls}" onclick="showDayDetail('${dateStr}')">${day}</div>`;
+      }
+
+      document.getElementById('calendarGrid').innerHTML = html;
+    }
+
+    function showDayDetail(dateStr) {
+      if (!currentPlan) return;
+      const visits = currentPlan.plannedVisits.filter(v => v.date === dateStr);
+      document.getElementById('dayDetailTitle').textContent = Format.date(dateStr);
+      if (!visits.length) {
+        document.getElementById('dayDetailBody').innerHTML = `<div class="empty-state" style="padding:24px"><div class="empty-icon">📅</div><p>No visits planned for this day</p></div>`;
+      } else {
+        document.getElementById('dayDetailBody').innerHTML = visits.map(v => `
+          <div class="list-item">
+            <div class="item-avatar">${Format.initials(v.doctorName)}</div>
+            <div class="item-body">
+              <div class="item-title">${v.doctorName}</div>
+              <div class="item-subtitle">📍 ${v.area} • ${v.visitType}</div>
+            </div>
+            <span class="badge ${v.status==='Completed'?'badge-success':v.status==='Pending'?'badge-warning':'badge-muted'}">${v.status}</span>
+          </div>
+        `).join('');
+      }
+      Modal.open('dayDetailModal');
+    }
+
+    function renderPlannedList() {
+      const list = document.getElementById('plannedList');
+      if (!currentPlan || !currentPlan.plannedVisits.length) {
+        list.innerHTML = `<div class="empty-state"><div class="empty-icon">📅</div><p>No planned visits</p></div>`;
+        return;
+      }
+      const sorted = [...currentPlan.plannedVisits].sort((a, b) => a.date.localeCompare(b.date));
+      list.innerHTML = sorted.map(v => `
+        <div class="card" style="margin-bottom:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="background:var(--primary-light);color:var(--primary-dark);padding:8px 10px;border-radius:var(--radius-sm);text-align:center;min-width:48px">
+              <div style="font-size:10px;font-weight:700;color:var(--text-muted)">${Format.date(v.date).split(' ')[1]}</div>
+              <div style="font-size:16px;font-weight:700">${new Date(v.date).getDate()}</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:600">${v.doctorName}</div>
+              <div style="font-size:12px;color:var(--text-muted)">📍 ${v.area}</div>
+            </div>
+            <span class="badge ${v.status==='Completed'?'badge-success':v.status==='Pending'?'badge-warning':'badge-muted'}">${v.status}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openCreatePlan() {
+      document.getElementById('planModalTitle').textContent = 'Create Monthly Plan';
+      document.getElementById('planMonth').value = currentMonth;
+      document.getElementById('planNotes').value = '';
+      visitRowCount = 0;
+      document.getElementById('visitRows').innerHTML = '';
+      addVisitRow();
+      Modal.open('planModal');
+    }
+
+    function editPlan() {
+      if (!currentPlan) return;
+      document.getElementById('planModalTitle').textContent = 'Edit Plan';
+      document.getElementById('planMonth').value = currentPlan.month;
+      document.getElementById('planNotes').value = currentPlan.notes || '';
+      visitRowCount = 0;
+      document.getElementById('visitRows').innerHTML = '';
+      currentPlan.plannedVisits.forEach(v => addVisitRow(v));
+      Modal.open('planModal');
+    }
+
+    function addVisitRow(prefill) {
+      visitRowCount++;
+      const id = visitRowCount;
+      const doctorOptions = allDoctors.map(d => `<option value="${d.id}" ${prefill?.doctorId===d.id?'selected':''}>${d.name}</option>`).join('');
+      const row = document.createElement('div');
+      row.id = `visitRow_${id}`;
+      row.style.cssText = 'background:var(--surface2);padding:12px;border-radius:var(--radius-sm);margin-bottom:8px';
+      row.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;color:var(--text-muted)">Visit ${id}</span>
+          <button type="button" onclick="document.getElementById('visitRow_${id}').remove()" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px">✕</button>
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <div class="form-group" style="margin-bottom:8px">
+            <input type="date" class="form-control" id="vDate_${id}" value="${prefill?.date||''}" style="font-size:13px">
+          </div>
+          <div class="form-group" style="margin-bottom:8px">
+            <select class="form-control" id="vDoctor_${id}" style="font-size:13px">
+              <option value="">Select doctor</option>
+              ${doctorOptions}
+            </select>
+          </div>
+        </div>
+      `;
+      document.getElementById('visitRows').appendChild(row);
+    }
+
+    async function savePlan() {
+      const user = Auth.user;
+      const btn = document.getElementById('savePlanBtn');
+      const month = document.getElementById('planMonth').value;
+      if (!month) { Toast.error('Select a month'); return; }
+
+      const plannedVisits = [];
+      for (let i = 1; i <= visitRowCount; i++) {
+        const dateEl = document.getElementById(`vDate_${i}`);
+        const docEl = document.getElementById(`vDoctor_${i}`);
+        if (!dateEl || !docEl) continue;
+        const date = dateEl.value;
+        const doctorId = docEl.value;
+        if (!date || !doctorId) continue;
+        const doctor = allDoctors.find(d => d.id === doctorId);
+        plannedVisits.push({
+          date, doctorId,
+          doctorName: doctor?.name || '',
+          area: doctor?.area || '',
+          visitType: 'Doctor Call',
+          status: 'Pending',
+        });
+      }
+
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        if (currentPlan) {
+          await apiCall('/planner', {
+            method: 'PUT',
+            body: JSON.stringify({ id: currentPlan.id, month, plannedVisits, notes: document.getElementById('planNotes').value }),
+          });
+          Toast.success('Plan updated');
+        } else {
+          await apiCall('/planner', {
+            method: 'POST',
+            body: JSON.stringify({ mrId: user.id, month, plannedVisits, notes: document.getElementById('planNotes').value }),
+          });
+          Toast.success('Plan created');
+        }
+        Modal.close('planModal');
+        await loadPlan();
+      } catch (err) { Toast.error(err.message); }
+      btn.disabled = false; btn.textContent = 'Save Plan';
+    }
+
+    async function submitPlan() {
+      if (!currentPlan) return;
+      if (!confirm('Submit this plan for approval?')) return;
+      try {
+        await apiCall('/planner', { method: 'PUT', body: JSON.stringify({ id: currentPlan.id, action: 'submit' }) });
+        Toast.success('Plan submitted for approval');
+        await loadPlan();
+      } catch (err) { Toast.error(err.message); }
+    }
+  </script>
+</body>
+</html>

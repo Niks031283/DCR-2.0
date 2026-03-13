@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0b6e6e">
+  <title>DCR — Pharma CRM</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="nav" id="topNav"></nav>
+
+  <main class="page">
+    <div class="container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Daily Call Report</h2>
+          <p id="visitCount">Visit history</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openNewDCR()">➕ New DCR</button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tabHistory" onclick="switchTab('history')">📋 History</button>
+        <button class="tab-btn" id="tabToday" onclick="switchTab('today')">📅 Today</button>
+      </div>
+
+      <!-- Month Filter -->
+      <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+        <input type="month" class="form-control" id="monthFilter" style="flex:1" onchange="loadVisits()">
+        <button class="btn btn-outline btn-sm" onclick="clearMonthFilter()">Clear</button>
+      </div>
+
+      <div id="visitList">
+        <div class="empty-state"><div class="empty-icon">📋</div><p>Loading visits...</p></div>
+      </div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" id="bottomNav"></nav>
+
+  <!-- New DCR Modal -->
+  <div class="modal-overlay" id="dcrModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <span class="modal-title">New DCR Entry</span>
+        <button class="modal-close" onclick="Modal.close('dcrModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="dcrForm">
+          <!-- Step Indicator -->
+          <div style="display:flex;gap:6px;margin-bottom:20px" id="stepIndicator">
+            <div style="flex:1;height:4px;border-radius:2px;background:var(--primary)" id="step1Ind"></div>
+            <div style="flex:1;height:4px;border-radius:2px;background:var(--border)" id="step2Ind"></div>
+            <div style="flex:1;height:4px;border-radius:2px;background:var(--border)" id="step3Ind"></div>
+          </div>
+
+          <!-- Step 1: Basic Info -->
+          <div id="dcrStep1">
+            <div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:14px">STEP 1 OF 3 — VISIT DETAILS</div>
+            <div class="form-group">
+              <label class="form-label">Select Doctor *</label>
+              <select class="form-control" id="dcrDoctor" required>
+                <option value="">Choose doctor...</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Visit Date *</label>
+                <input type="date" class="form-control" id="dcrDate" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Visit Time</label>
+                <input type="time" class="form-control" id="dcrTime">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Call Type</label>
+                <select class="form-control" id="dcrCallType">
+                  <option value="Planned">Planned</option>
+                  <option value="Unplanned">Unplanned</option>
+                  <option value="Joint">Joint Call</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Duration (min)</label>
+                <input type="number" class="form-control" id="dcrDuration" value="15" min="1" max="180">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Location / Address</label>
+              <input type="text" class="form-control" id="dcrLocation" placeholder="Clinic / hospital address">
+            </div>
+            <button type="button" class="btn btn-primary btn-full" onclick="nextStep(2)">Next →</button>
+          </div>
+
+          <!-- Step 2: Products & Samples -->
+          <div id="dcrStep2" class="hidden">
+            <div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:14px">STEP 2 OF 3 — PRODUCTS & SAMPLES</div>
+            <div class="form-group">
+              <label class="form-label">Products Detailed</label>
+              <div id="productCheckboxes" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Samples Given</label>
+              <div id="sampleInputs"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Literature Given</label>
+              <input type="text" class="form-control" id="dcrLiterature" placeholder="e.g. Detail aid, Study reprint...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Gifts / Promotional Items</label>
+              <input type="text" class="form-control" id="dcrGifts" placeholder="e.g. Pen, Notepad...">
+            </div>
+            <div style="display:flex;gap:10px">
+              <button type="button" class="btn btn-outline" onclick="nextStep(1)" style="flex:1">← Back</button>
+              <button type="button" class="btn btn-primary" onclick="nextStep(3)" style="flex:2">Next →</button>
+            </div>
+          </div>
+
+          <!-- Step 3: Outcome & Notes -->
+          <div id="dcrStep3" class="hidden">
+            <div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:14px">STEP 3 OF 3 — OUTCOME</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:14px">
+              <div>
+                <div style="font-size:14px;font-weight:600">Prescription Generated?</div>
+                <div style="font-size:12px;color:var(--text-muted)">Did doctor write prescription?</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <input type="checkbox" id="dcrRxGenerated" style="width:20px;height:20px;accent-color:var(--primary)" onchange="toggleRxCount()">
+              </div>
+            </div>
+            <div class="form-group" id="rxCountGroup" style="display:none">
+              <label class="form-label">Number of Prescriptions</label>
+              <input type="number" class="form-control" id="dcrRxCount" value="1" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Doctor's Feedback</label>
+              <textarea class="form-control" id="dcrFeedback" rows="2" placeholder="What did the doctor say?"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Notes / Observations</label>
+              <textarea class="form-control" id="dcrNotes" rows="2" placeholder="Any observations from this visit..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Next Visit Date</label>
+              <input type="date" class="form-control" id="dcrNextVisit">
+            </div>
+            <div style="display:flex;gap:10px">
+              <button type="button" class="btn btn-outline" onclick="nextStep(2)" style="flex:1">← Back</button>
+              <button type="button" class="btn btn-primary" onclick="submitDCR()" style="flex:2" id="submitDCRBtn">✅ Submit DCR</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visit Detail Modal -->
+  <div class="modal-overlay" id="visitDetailModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <span class="modal-title">Visit Details</span>
+        <button class="modal-close" onclick="Modal.close('visitDetailModal')">✕</button>
+      </div>
+      <div class="modal-body" id="visitDetailBody"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    let allDoctors = [];
+    let allProducts = [];
+    let currentStep = 1;
+    let activeTab = 'history';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      renderNav('dcr');
+
+      const now = new Date();
+      document.getElementById('dcrDate').value = now.toISOString().split('T')[0];
+      document.getElementById('dcrTime').value = now.toTimeString().slice(0, 5);
+      document.getElementById('monthFilter').value = now.toISOString().slice(0, 7);
+
+      await Promise.all([loadDoctors(), loadProducts(), loadVisits()]);
+
+      const params = new URLSearchParams(location.search);
+      if (params.get('new') === '1') openNewDCR(params.get('doctorId'));
+    });
+
+    async function loadDoctors() {
+      const user = Auth.user;
+      const res = await apiCall(`/doctors?mrId=${user.id}`);
+      allDoctors = res.data;
+      const sel = document.getElementById('dcrDoctor');
+      sel.innerHTML = '<option value="">Choose doctor...</option>' +
+        allDoctors.map(d => `<option value="${d.id}">${d.name} — ${d.specialization}</option>`).join('');
+    }
+
+    async function loadProducts() {
+      const res = await apiCall('/products');
+      allProducts = res.data;
+      renderProductCheckboxes();
+    }
+
+    function renderProductCheckboxes() {
+      document.getElementById('productCheckboxes').innerHTML = allProducts.map(p => `
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);cursor:pointer;font-size:13px;font-weight:500">
+          <input type="checkbox" value="${p.id}" name="products" style="accent-color:var(--primary)" onchange="updateSampleInputs()">
+          ${p.name}
+        </label>
+      `).join('');
+    }
+
+    function updateSampleInputs() {
+      const checked = [...document.querySelectorAll('input[name="products"]:checked')].map(c => c.value);
+      const sampleProds = allProducts.filter(p => p.sampleAvailable && checked.includes(p.id));
+      document.getElementById('sampleInputs').innerHTML = sampleProds.map(p => `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <div style="flex:1;font-size:13px;font-weight:500">${p.name}</div>
+          <input type="number" min="0" max="20" value="0" id="sample_${p.id}"
+            style="width:70px" class="form-control" placeholder="Qty">
+        </div>
+      `).join('') || '<p class="text-muted text-sm">No sample-eligible products selected</p>';
+    }
+
+    async function loadVisits() {
+      try {
+        const user = Auth.user;
+        const month = document.getElementById('monthFilter').value;
+        let url = `/visits?mrId=${user.id}&limit=50`;
+        if (month) url += `&month=${month}`;
+        const res = await apiCall(url);
+        const visits = res.data;
+        document.getElementById('visitCount').textContent = `${res.total} visits${month ? ' in ' + Format.monthName(month) : ''}`;
+        renderVisits(visits);
+      } catch (err) { Toast.error('Failed to load visits'); }
+    }
+
+    function clearMonthFilter() {
+      document.getElementById('monthFilter').value = '';
+      loadVisits();
+    }
+
+    function switchTab(tab) {
+      activeTab = tab;
+      document.getElementById('tabHistory').classList.toggle('active', tab === 'history');
+      document.getElementById('tabToday').classList.toggle('active', tab === 'today');
+      document.getElementById('monthFilter').parentElement.style.display = tab === 'today' ? 'none' : 'flex';
+      if (tab === 'today') loadTodayVisits();
+      else loadVisits();
+    }
+
+    async function loadTodayVisits() {
+      const user = Auth.user;
+      const today = new Date().toISOString().split('T')[0];
+      const res = await apiCall(`/visits?mrId=${user.id}&from=${today}&to=${today}`);
+      document.getElementById('visitCount').textContent = `${res.total} visits today`;
+      renderVisits(res.data);
+    }
+
+    function renderVisits(visits) {
+      const list = document.getElementById('visitList');
+      if (!visits.length) {
+        list.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>No visits found</p><button class="btn btn-primary btn-sm" onclick="openNewDCR()">Add DCR</button></div>`;
+        return;
+      }
+      list.innerHTML = visits.map(v => `
+        <div class="visit-card slide-up" onclick="showVisitDetail('${v.id}')">
+          <div class="visit-header">
+            <div>
+              <div class="visit-doctor">${v.doctorName}</div>
+              <div class="visit-spec">${v.specialization}</div>
+            </div>
+            <span class="badge ${v.rxGenerated ? 'badge-success' : 'badge-muted'}">${v.rxGenerated ? `Rx ×${v.rxCount}` : 'No Rx'}</span>
+          </div>
+          <div class="visit-meta">
+            <span class="visit-meta-item">📅 ${Format.date(v.visitDate)}</span>
+            <span class="visit-meta-item">🕐 ${Format.time(v.visitTime)}</span>
+            <span class="visit-meta-item">⏱ ${v.duration}min</span>
+            <span class="badge ${v.callType==='Planned'?'badge-info':'badge-warning'}">${v.callType}</span>
+          </div>
+          ${v.productsDetailed?.length ? `
+            <div class="visit-products">
+              ${v.productsDetailed.slice(0,3).map(pid => {
+                const p = allProducts.find(x => x.id === pid);
+                return p ? `<span class="product-tag">${p.name}</span>` : '';
+              }).join('')}
+              ${v.productsDetailed.length > 3 ? `<span class="product-tag">+${v.productsDetailed.length-3}</span>` : ''}
+            </div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function showVisitDetail(id) {
+      fetch(`/api/visits?mrId=${Auth.user.id}&limit=100`).then(r => r.json()).then(res => {
+        const v = res.data.find(x => x.id === id);
+        if (!v) return;
+        document.getElementById('visitDetailBody').innerHTML = `
+          <div style="margin-bottom:16px">
+            <div style="font-size:17px;font-weight:700">${v.doctorName}</div>
+            <div style="font-size:13px;color:var(--primary)">${v.specialization}</div>
+          </div>
+          <div class="divider"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+            <div style="background:var(--surface2);padding:10px;border-radius:var(--radius-sm)">
+              <div style="font-size:11px;color:var(--text-muted)">Date</div>
+              <div style="font-size:13px;font-weight:600">${Format.date(v.visitDate)}</div>
+            </div>
+            <div style="background:var(--surface2);padding:10px;border-radius:var(--radius-sm)">
+              <div style="font-size:11px;color:var(--text-muted)">Time</div>
+              <div style="font-size:13px;font-weight:600">${Format.time(v.visitTime)} (${v.duration}min)</div>
+            </div>
+            <div style="background:var(--surface2);padding:10px;border-radius:var(--radius-sm)">
+              <div style="font-size:11px;color:var(--text-muted)">Call Type</div>
+              <span class="badge ${v.callType==='Planned'?'badge-info':'badge-warning'}">${v.callType}</span>
+            </div>
+            <div style="background:var(--surface2);padding:10px;border-radius:var(--radius-sm)">
+              <div style="font-size:11px;color:var(--text-muted)">Prescription</div>
+              <div style="font-size:13px;font-weight:600;color:${v.rxGenerated?'var(--success)':'var(--text-muted)'}">${v.rxGenerated?`✅ Rx ×${v.rxCount}`:'None'}</div>
+            </div>
+          </div>
+          ${v.productsDetailed?.length ? `<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">PRODUCTS DETAILED</div><div class="visit-products">${v.productsDetailed.map(pid=>{const p=allProducts.find(x=>x.id===pid);return p?`<span class="product-tag">${p.name}</span>`:''}).join('')}</div></div>` : ''}
+          ${v.sampleGiven?.length ? `<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">SAMPLES GIVEN</div>${v.sampleGiven.map(s=>{const p=allProducts.find(x=>x.id===s.productId);return `<div style="font-size:13px;margin-bottom:4px">• ${p?p.name:s.productId} × ${s.quantity}</div>`;}).join('')}</div>` : ''}
+          ${v.feedbackFromDoctor ? `<div style="background:var(--success-light);padding:12px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:10px">💬 ${v.feedbackFromDoctor}</div>` : ''}
+          ${v.notes ? `<div style="background:var(--accent-light);padding:12px;border-radius:var(--radius-sm);font-size:13px">📝 ${v.notes}</div>` : ''}
+        `;
+        Modal.open('visitDetailModal');
+      });
+    }
+
+    function openNewDCR(prefillDoctorId) {
+      currentStep = 1;
+      document.getElementById('dcrForm').reset();
+      document.getElementById('dcrDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('dcrTime').value = new Date().toTimeString().slice(0, 5);
+      if (prefillDoctorId) document.getElementById('dcrDoctor').value = prefillDoctorId;
+      renderProductCheckboxes();
+      showStep(1);
+      Modal.open('dcrModal');
+    }
+
+    function showStep(n) {
+      [1,2,3].forEach(i => {
+        document.getElementById(`dcrStep${i}`).classList.toggle('hidden', i !== n);
+        document.getElementById(`step${i}Ind`).style.background = i <= n ? 'var(--primary)' : 'var(--border)';
+      });
+      currentStep = n;
+    }
+
+    function nextStep(n) {
+      if (n === 2) {
+        if (!document.getElementById('dcrDoctor').value) { Toast.error('Please select a doctor'); return; }
+        if (!document.getElementById('dcrDate').value) { Toast.error('Please select visit date'); return; }
+      }
+      showStep(n);
+    }
+
+    function toggleRxCount() {
+      const checked = document.getElementById('dcrRxGenerated').checked;
+      document.getElementById('rxCountGroup').style.display = checked ? 'block' : 'none';
+    }
+
+    async function submitDCR() {
+      const user = Auth.user;
+      const btn = document.getElementById('submitDCRBtn');
+      const selectedProds = [...document.querySelectorAll('input[name="products"]:checked')].map(c => c.value);
+      const sampleProds = allProducts.filter(p => p.sampleAvailable && selectedProds.includes(p.id));
+      const sampleGiven = sampleProds.map(p => ({
+        productId: p.id,
+        quantity: parseInt(document.getElementById(`sample_${p.id}`)?.value || '0'),
+      })).filter(s => s.quantity > 0);
+
+      const litStr = document.getElementById('dcrLiterature').value;
+      const giftStr = document.getElementById('dcrGifts').value;
+      const payload = {
+        mrId: user.id, mrName: user.name,
+        doctorId: document.getElementById('dcrDoctor').value,
+        visitDate: document.getElementById('dcrDate').value,
+        visitTime: document.getElementById('dcrTime').value,
+        location: document.getElementById('dcrLocation').value,
+        callType: document.getElementById('dcrCallType').value,
+        duration: document.getElementById('dcrDuration').value,
+        productsDetailed: selectedProds,
+        sampleGiven,
+        literatureGiven: litStr ? litStr.split(',').map(s=>s.trim()).filter(Boolean) : [],
+        giftsGiven: giftStr ? giftStr.split(',').map(s=>s.trim()).filter(Boolean) : [],
+        rxGenerated: document.getElementById('dcrRxGenerated').checked,
+        rxCount: document.getElementById('dcrRxCount').value || 0,
+        feedbackFromDoctor: document.getElementById('dcrFeedback').value,
+        notes: document.getElementById('dcrNotes').value,
+        nextVisitDate: document.getElementById('dcrNextVisit').value,
+      };
+
+      btn.disabled = true; btn.textContent = 'Submitting...';
+      try {
+        await apiCall('/dcr', { method: 'POST', body: JSON.stringify(payload) });
+        Toast.success('DCR submitted successfully! 🎉');
+        Modal.close('dcrModal');
+        await loadVisits();
+      } catch (err) { Toast.error(err.message); }
+      btn.disabled = false; btn.textContent = '✅ Submit DCR';
+    }
+  </script>
+</body>
+</html>

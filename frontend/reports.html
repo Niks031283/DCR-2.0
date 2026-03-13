@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0b6e6e">
+  <title>Reports — Pharma CRM</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="nav" id="topNav"></nav>
+
+  <main class="page">
+    <div class="container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Reports</h2>
+          <p>Coverage & Missed Calls</p>
+        </div>
+        <input type="month" class="form-control" id="reportMonth" style="width:auto" onchange="loadReports()">
+      </div>
+
+      <!-- Report Tabs -->
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tabCoverage" onclick="switchTab('coverage')">📈 Coverage</button>
+        <button class="tab-btn" id="tabMissed" onclick="switchTab('missed')">❌ Missed</button>
+        <button class="tab-btn" id="tabActivity" onclick="switchTab('activity')">📊 Activity</button>
+      </div>
+
+      <!-- Coverage Report -->
+      <div id="coverageSection">
+        <!-- Summary Cards -->
+        <div class="stats-grid" id="coverageStats">
+          <div class="stat-card teal"><div class="stat-icon">👨‍⚕️</div><div class="stat-value" id="cov-total">—</div><div class="stat-label">Total Doctors</div></div>
+          <div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-value" id="cov-covered">—</div><div class="stat-label">Covered</div></div>
+          <div class="stat-card amber"><div class="stat-icon">📋</div><div class="stat-value" id="cov-visits">—</div><div class="stat-label">Total Visits</div></div>
+          <div class="stat-card blue"><div class="stat-icon">📈</div><div class="stat-value" id="cov-pct">—</div><div class="stat-label">Coverage %</div></div>
+        </div>
+
+        <!-- Coverage by Category -->
+        <div class="section-title">Coverage by Category</div>
+        <div class="card mb-4" id="catCoverage">
+          <div class="empty-state" style="padding:16px"><p>Loading...</p></div>
+        </div>
+
+        <!-- Coverage by Area -->
+        <div class="section-title">Coverage by Area</div>
+        <div class="card mb-4" id="areaCoverage">
+          <div class="empty-state" style="padding:16px"><p>Loading...</p></div>
+        </div>
+
+        <!-- Uncovered Doctors -->
+        <div class="section-title">Uncovered Doctors</div>
+        <div id="uncoveredList">
+          <div class="empty-state"><div class="empty-icon">🎉</div><p>All doctors covered!</p></div>
+        </div>
+      </div>
+
+      <!-- Missed Calls Report -->
+      <div id="missedSection" class="hidden">
+        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat-card amber"><div class="stat-icon">⏰</div><div class="stat-value" id="miss-overdue">—</div><div class="stat-label">Overdue</div></div>
+          <div class="stat-card teal"><div class="stat-icon">❌</div><div class="stat-value" id="miss-planned">—</div><div class="stat-label">Missed Planned</div></div>
+          <div class="stat-card blue"><div class="stat-icon">👤</div><div class="stat-value" id="miss-not">—</div><div class="stat-label">Not Visited</div></div>
+        </div>
+
+        <div class="section-title">Overdue by Frequency</div>
+        <div id="overdueList"><div class="empty-state"><p>Loading...</p></div></div>
+
+        <div class="section-title" style="margin-top:16px">Missed Planned Calls</div>
+        <div id="missedPlannedList"><div class="empty-state"><p>Loading...</p></div></div>
+
+        <div class="section-title" style="margin-top:16px">Not Visited This Month</div>
+        <div id="notVisitedList"><div class="empty-state"><p>Loading...</p></div></div>
+      </div>
+
+      <!-- Activity Report -->
+      <div id="activitySection" class="hidden">
+        <div class="section-title">Visit Statistics</div>
+        <div id="activityStats">
+          <div class="empty-state"><p>Loading...</p></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <nav class="bottom-nav" id="bottomNav"></nav>
+
+  <script src="/app.js"></script>
+  <script>
+    let activeTab = 'coverage';
+    let coverageData = null;
+    let missedData = null;
+    let activityData = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      renderNav('reports');
+      document.getElementById('reportMonth').value = new Date().toISOString().slice(0, 7);
+      await loadReports();
+    });
+
+    async function loadReports() {
+      const user = Auth.user;
+      const month = document.getElementById('reportMonth').value;
+      const params = `mrId=${user.id}${month ? '&month=' + month : ''}`;
+
+      try {
+        const [covRes, missRes, visitRes] = await Promise.all([
+          apiCall(`/coverage?${params}`),
+          apiCall(`/missed?${params}`),
+          apiCall(`/visits?mrId=${user.id}${month ? '&month=' + month : ''}&limit=200`),
+        ]);
+        coverageData = covRes.data;
+        missedData = missRes.data;
+        activityData = visitRes;
+
+        renderCoverageReport();
+        renderMissedReport();
+        renderActivityReport();
+      } catch (err) {
+        Toast.error('Failed to load reports');
+        console.error(err);
+      }
+    }
+
+    function switchTab(tab) {
+      activeTab = tab;
+      ['coverage', 'missed', 'activity'].forEach(t => {
+        document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}`).classList.toggle('active', t === tab);
+        document.getElementById(`${t}Section`).classList.toggle('hidden', t !== tab);
+      });
+    }
+
+    function renderCoverageReport() {
+      if (!coverageData) return;
+      const s = coverageData.summary;
+      document.getElementById('cov-total').textContent = s.totalDoctors;
+      document.getElementById('cov-covered').textContent = s.coveredDoctors;
+      document.getElementById('cov-visits').textContent = s.totalVisits;
+      document.getElementById('cov-pct').textContent = s.coveragePercent + '%';
+
+      // Category breakdown
+      const catEl = document.getElementById('catCoverage');
+      const cats = coverageData.categoryBreakdown;
+      if (Object.keys(cats).length) {
+        catEl.innerHTML = ['A', 'B', 'C'].filter(c => cats[c]).map(cat => {
+          const c = cats[cat];
+          return `
+            <div class="chart-bar-item">
+              <div class="chart-bar-label">
+                <span>Category ${cat} <span class="badge badge-${cat}" style="margin-left:4px">${cat}</span></span>
+                <span>${c.covered}/${c.total} • ${c.percent}%</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:${c.percent}%;background:${cat==='A'?'var(--accent)':cat==='B'?'var(--info)':'var(--text-muted)'}"></div></div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        catEl.innerHTML = '<p class="text-muted text-sm text-center" style="padding:12px">No data</p>';
+      }
+
+      // Area breakdown
+      const areaEl = document.getElementById('areaCoverage');
+      const areas = coverageData.areaBreakdown;
+      const areaKeys = Object.keys(areas);
+      if (areaKeys.length) {
+        areaEl.innerHTML = areaKeys.sort((a, b) => areas[b].percent - areas[a].percent).map(area => {
+          const a = areas[area];
+          return `
+            <div class="chart-bar-item">
+              <div class="chart-bar-label">
+                <span>📍 ${area}</span>
+                <span>${a.covered}/${a.total} • ${a.percent}%</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:${a.percent}%"></div></div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        areaEl.innerHTML = '<p class="text-muted text-sm text-center" style="padding:12px">No area data</p>';
+      }
+
+      // Uncovered doctors
+      const uncEl = document.getElementById('uncoveredList');
+      const uncovered = coverageData.uncoveredDoctors;
+      if (!uncovered.length) {
+        uncEl.innerHTML = `<div class="empty-state" style="padding:24px"><div style="font-size:36px">🎉</div><p style="color:var(--success);font-weight:600">All doctors covered this month!</p></div>`;
+      } else {
+        uncEl.innerHTML = uncovered.map(d => `
+          <div class="doctor-card" style="margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="item-avatar" style="background:var(--danger-light);color:var(--danger)">${Format.initials(d.name)}</div>
+              <div style="flex:1">
+                <div class="doctor-name">${d.name}</div>
+                <div class="doctor-spec">${d.specialization}</div>
+                <div class="doctor-hospital">📍 ${d.area} • Last: ${d.lastVisit ? Format.daysSince(d.lastVisit) : 'Never'}</div>
+              </div>
+              <span class="badge badge-${d.category}">${d.category}</span>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function renderMissedReport() {
+      if (!missedData) return;
+      const s = missedData.summary;
+      document.getElementById('miss-overdue').textContent = s.overdueCount;
+      document.getElementById('miss-planned').textContent = s.plannedMissedCount;
+      document.getElementById('miss-not').textContent = s.notVisitedThisMonthCount;
+
+      // Overdue list
+      const overdueEl = document.getElementById('overdueList');
+      if (!missedData.overdueByFrequency.length) {
+        overdueEl.innerHTML = `<div class="empty-state" style="padding:16px"><div style="font-size:24px">✅</div><p>No overdue visits!</p></div>`;
+      } else {
+        overdueEl.innerHTML = missedData.overdueByFrequency.slice(0, 10).map(d => `
+          <div class="card" style="margin-bottom:8px;padding:12px;border-left:3px solid ${d.overdueDays > 14 ? 'var(--danger)' : 'var(--warning)'}">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:600">${d.name}</div>
+                <div style="font-size:12px;color:var(--text-muted)">${d.specialization} • ${d.area}</div>
+                <div style="font-size:12px;margin-top:4px">Frequency: <strong>${d.frequency}</strong> • Last: <strong>${d.lastVisit ? Format.daysSince(d.lastVisit) : 'Never'}</strong></div>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div style="font-size:18px;font-weight:700;color:${d.overdueDays > 14 ? 'var(--danger)' : 'var(--warning)'}">+${d.overdueDays}d</div>
+                <div style="font-size:10px;color:var(--text-muted)">overdue</div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Missed planned
+      const mpEl = document.getElementById('missedPlannedList');
+      if (!missedData.plannedMissed.length) {
+        mpEl.innerHTML = `<div class="empty-state" style="padding:16px"><div style="font-size:24px">✅</div><p>No missed planned calls!</p></div>`;
+      } else {
+        mpEl.innerHTML = missedData.plannedMissed.map(v => `
+          <div class="card" style="margin-bottom:8px;padding:12px;border-left:3px solid var(--danger)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-size:14px;font-weight:600">${v.doctorName}</div>
+                <div style="font-size:12px;color:var(--text-muted)">📅 ${Format.date(v.plannedDate)} • 📍 ${v.area}</div>
+              </div>
+              <div style="text-align:right">
+                <span class="badge badge-danger">+${v.daysOverdue}d late</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Not visited this month
+      const nvEl = document.getElementById('notVisitedList');
+      if (!missedData.notVisitedThisMonth.length) {
+        nvEl.innerHTML = `<div class="empty-state" style="padding:16px"><div style="font-size:24px">🎉</div><p>All doctors visited this month!</p></div>`;
+      } else {
+        nvEl.innerHTML = missedData.notVisitedThisMonth.map(d => `
+          <div class="list-item">
+            <div class="item-avatar" style="background:var(--surface2)">${Format.initials(d.name)}</div>
+            <div class="item-body">
+              <div class="item-title">${d.name}</div>
+              <div class="item-subtitle">${d.specialization} • ${d.area}</div>
+            </div>
+            <span class="badge badge-${d.category}">${d.category}</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    function renderActivityReport() {
+      if (!activityData) return;
+      const stats = activityData.stats;
+      document.getElementById('activityStats').innerHTML = `
+        <div class="stats-grid" style="margin-bottom:16px">
+          <div class="stat-card teal"><div class="stat-icon">📋</div><div class="stat-value">${stats.totalVisits}</div><div class="stat-label">Total Visits</div></div>
+          <div class="stat-card green"><div class="stat-icon">👨‍⚕️</div><div class="stat-value">${stats.uniqueDoctors}</div><div class="stat-label">Unique Doctors</div></div>
+          <div class="stat-card amber"><div class="stat-icon">💊</div><div class="stat-value">${stats.totalRx}</div><div class="stat-label">Total Rx</div></div>
+          <div class="stat-card blue"><div class="stat-icon">⏱</div><div class="stat-value">${stats.avgDuration}m</div><div class="stat-label">Avg Duration</div></div>
+        </div>
+        <div class="section-title">Recent Visit Activity</div>
+        <div class="card">
+          ${activityData.data.slice(0, 10).map(v => `
+            <div class="list-item">
+              <div class="item-avatar">${Format.initials(v.doctorName)}</div>
+              <div class="item-body">
+                <div class="item-title">${v.doctorName}</div>
+                <div class="item-subtitle">📅 ${Format.date(v.visitDate)} • ${v.callType}</div>
+              </div>
+              <span class="badge ${v.rxGenerated?'badge-success':'badge-muted'}">${v.rxGenerated?`Rx×${v.rxCount}`:'No Rx'}</span>
+            </div>
+          `).join('') || '<div class="empty-state" style="padding:16px"><p>No visit data</p></div>'}
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

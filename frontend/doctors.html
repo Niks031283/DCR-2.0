@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0b6e6e">
+  <title>Doctors — Pharma CRM</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="nav" id="topNav"></nav>
+
+  <main class="page">
+    <div class="container">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Doctor Master</h2>
+          <p id="docCount">Loading...</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openAddDoctor()">➕ Add</button>
+      </div>
+
+      <!-- Search -->
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="form-control" id="searchInput" placeholder="Search by name, specialization, area..." oninput="filterDoctors()">
+      </div>
+
+      <!-- Filter Chips -->
+      <div class="filter-chips" id="filterChips">
+        <span class="chip active" data-filter="all" onclick="setFilter('all',this)">All</span>
+        <span class="chip" data-filter="A" onclick="setFilter('A',this)">⭐ Category A</span>
+        <span class="chip" data-filter="B" onclick="setFilter('B',this)">Category B</span>
+        <span class="chip" data-filter="C" onclick="setFilter('C',this)">Category C</span>
+      </div>
+
+      <!-- Doctor List -->
+      <div id="doctorList">
+        <div class="empty-state">
+          <div class="empty-icon">👨‍⚕️</div>
+          <p>Loading doctors...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" id="bottomNav"></nav>
+
+  <!-- Add/Edit Doctor Modal -->
+  <div class="modal-overlay" id="doctorModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <span class="modal-title" id="doctorModalTitle">Add Doctor</span>
+        <button class="modal-close" onclick="Modal.close('doctorModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="doctorForm">
+          <input type="hidden" id="doctorId">
+          <div class="form-group">
+            <label class="form-label">Full Name *</label>
+            <input type="text" class="form-control" id="docName" placeholder="Dr. First Last" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Specialization *</label>
+              <select class="form-control" id="docSpec">
+                <option value="">Select...</option>
+                <option>Cardiologist</option>
+                <option>Diabetologist</option>
+                <option>General Physician</option>
+                <option>Neurologist</option>
+                <option>Gynaecologist</option>
+                <option>Paediatrician</option>
+                <option>Orthopaedic</option>
+                <option>Dermatologist</option>
+                <option>Pulmonologist</option>
+                <option>Oncologist</option>
+                <option>Psychiatrist</option>
+                <option>Urologist</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Category</label>
+              <select class="form-control" id="docCategory">
+                <option value="A">A - High Value</option>
+                <option value="B">B - Medium Value</option>
+                <option value="C">C - Low Value</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Degree / Qualification</label>
+            <input type="text" class="form-control" id="docDegree" placeholder="MBBS, MD, DM etc.">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Hospital / Clinic</label>
+            <input type="text" class="form-control" id="docHospital" placeholder="Hospital name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Address</label>
+            <input type="text" class="form-control" id="docAddress" placeholder="Full address">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Area</label>
+              <input type="text" class="form-control" id="docArea" placeholder="Area / Locality">
+            </div>
+            <div class="form-group">
+              <label class="form-label">City</label>
+              <input type="text" class="form-control" id="docCity" placeholder="City">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input type="tel" class="form-control" id="docPhone" placeholder="10-digit number">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Visit Frequency</label>
+              <select class="form-control" id="docFrequency">
+                <option value="Weekly">Weekly</option>
+                <option value="Fortnightly">Fortnightly</option>
+                <option value="Monthly" selected>Monthly</option>
+                <option value="Quarterly">Quarterly</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" id="docNotes" placeholder="Preferences, visit time, any special notes..." rows="2"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="Modal.close('doctorModal')" style="flex:1">Cancel</button>
+        <button class="btn btn-primary" onclick="saveDoctor()" style="flex:2" id="saveDoctorBtn">Save Doctor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Doctor Detail Modal -->
+  <div class="modal-overlay" id="doctorDetailModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <span class="modal-title">Doctor Details</span>
+        <button class="modal-close" onclick="Modal.close('doctorDetailModal')">✕</button>
+      </div>
+      <div class="modal-body" id="doctorDetailBody"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    let allDoctors = [];
+    let activeFilter = 'all';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      renderNav('doctors');
+      await loadDoctors();
+
+      // Open add modal if ?new=1
+      if (new URLSearchParams(location.search).get('new') === '1') openAddDoctor();
+    });
+
+    async function loadDoctors() {
+      try {
+        const user = Auth.user;
+        const res = await apiCall(`/doctors?mrId=${user.id}`);
+        allDoctors = res.data;
+        document.getElementById('docCount').textContent = `${allDoctors.length} doctors in your territory`;
+        renderDoctors(allDoctors);
+      } catch (err) {
+        Toast.error('Failed to load doctors');
+      }
+    }
+
+    function setFilter(filter, el) {
+      activeFilter = filter;
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      filterDoctors();
+    }
+
+    function filterDoctors() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      let filtered = allDoctors;
+      if (activeFilter !== 'all') filtered = filtered.filter(d => d.category === activeFilter);
+      if (q) filtered = filtered.filter(d =>
+        d.name.toLowerCase().includes(q) ||
+        d.specialization.toLowerCase().includes(q) ||
+        d.area.toLowerCase().includes(q) ||
+        d.hospital.toLowerCase().includes(q)
+      );
+      renderDoctors(filtered);
+    }
+
+    function renderDoctors(doctors) {
+      const list = document.getElementById('doctorList');
+      if (!doctors.length) {
+        list.innerHTML = `<div class="empty-state"><div class="empty-icon">👨‍⚕️</div><p>No doctors found</p><button class="btn btn-primary btn-sm" onclick="openAddDoctor()">Add Doctor</button></div>`;
+        return;
+      }
+      list.innerHTML = doctors.map(d => `
+        <div class="doctor-card slide-up" onclick="showDoctorDetail('${d.id}')">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div class="item-avatar" style="background:${d.category==='A'?'var(--accent-light)':d.category==='B'?'var(--info-light)':'var(--border-light)'};color:${d.category==='A'?'#92400e':d.category==='B'?'#1e40af':'var(--text-secondary)'};width:48px;height:48px">
+              ${Format.initials(d.name)}
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="doctor-name">${d.name}</div>
+              <div class="doctor-spec">${d.specialization}</div>
+              <div class="doctor-hospital">🏥 ${d.hospital || 'No hospital'}</div>
+              <div class="doctor-hospital">📍 ${d.area}${d.city ? ', '+d.city : ''}</div>
+            </div>
+            <span class="badge badge-${d.category}">${d.category}</span>
+          </div>
+          <div class="doctor-footer">
+            <div>
+              <span class="text-xs text-muted">Last Visit: </span>
+              <span class="text-xs" style="font-weight:600;color:${!d.lastVisit||daysSinceCount(d.lastVisit)>30?'var(--danger)':'var(--success)'}">${d.lastVisit ? Format.daysSince(d.lastVisit) : 'Never'}</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span class="text-xs text-muted">${d.totalVisits} visits</span>
+              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editDoctor('${d.id}')">Edit</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function daysSinceCount(dateStr) {
+      if (!dateStr) return 9999;
+      return Math.floor((Date.now() - new Date(dateStr)) / 86400000);
+    }
+
+    function showDoctorDetail(id) {
+      const d = allDoctors.find(x => x.id === id);
+      if (!d) return;
+      document.getElementById('doctorDetailBody').innerHTML = `
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+          <div class="item-avatar" style="width:56px;height:56px;font-size:16px;border-radius:14px">${Format.initials(d.name)}</div>
+          <div>
+            <div style="font-size:17px;font-weight:700">${d.name}</div>
+            <div style="font-size:13px;color:var(--primary);font-weight:500">${d.specialization}</div>
+            <div style="font-size:12px;color:var(--text-muted)">${d.degree || ''}</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+          <div style="background:var(--surface2);padding:12px;border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Category</div>
+            <span class="badge badge-${d.category}">${d.category}</span>
+          </div>
+          <div style="background:var(--surface2);padding:12px;border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Frequency</div>
+            <div style="font-size:13px;font-weight:600">${d.frequency}</div>
+          </div>
+          <div style="background:var(--surface2);padding:12px;border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Total Visits</div>
+            <div style="font-size:20px;font-weight:700;color:var(--primary)">${d.totalVisits}</div>
+          </div>
+          <div style="background:var(--surface2);padding:12px;border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Last Visit</div>
+            <div style="font-size:13px;font-weight:600">${d.lastVisit ? Format.date(d.lastVisit) : 'Never'}</div>
+          </div>
+        </div>
+        ${d.hospital ? `<div class="text-sm" style="margin-bottom:8px">🏥 ${d.hospital}</div>` : ''}
+        ${d.address ? `<div class="text-sm" style="margin-bottom:8px">📍 ${d.address}</div>` : ''}
+        ${d.phone ? `<div class="text-sm" style="margin-bottom:8px">📞 <a href="tel:${d.phone}" style="color:var(--primary)">${d.phone}</a></div>` : ''}
+        ${d.notes ? `<div style="background:var(--accent-light);padding:12px;border-radius:var(--radius-sm);margin-top:12px;font-size:13px">📝 ${d.notes}</div>` : ''}
+        <div style="display:flex;gap:10px;margin-top:20px">
+          <a href="/visits.html?doctorId=${d.id}&new=1" class="btn btn-primary" style="flex:1">📋 Add DCR</a>
+          <button class="btn btn-secondary" onclick="Modal.close('doctorDetailModal');editDoctor('${d.id}')" style="flex:1">✏️ Edit</button>
+        </div>
+      `;
+      Modal.open('doctorDetailModal');
+    }
+
+    function openAddDoctor() {
+      document.getElementById('doctorModalTitle').textContent = 'Add Doctor';
+      document.getElementById('doctorForm').reset();
+      document.getElementById('doctorId').value = '';
+      Modal.open('doctorModal');
+    }
+
+    function editDoctor(id) {
+      const d = allDoctors.find(x => x.id === id);
+      if (!d) return;
+      document.getElementById('doctorModalTitle').textContent = 'Edit Doctor';
+      document.getElementById('doctorId').value = d.id;
+      document.getElementById('docName').value = d.name;
+      document.getElementById('docSpec').value = d.specialization;
+      document.getElementById('docCategory').value = d.category;
+      document.getElementById('docDegree').value = d.degree || '';
+      document.getElementById('docHospital').value = d.hospital || '';
+      document.getElementById('docAddress').value = d.address || '';
+      document.getElementById('docArea').value = d.area || '';
+      document.getElementById('docCity').value = d.city || '';
+      document.getElementById('docPhone').value = d.phone || '';
+      document.getElementById('docFrequency').value = d.frequency || 'Monthly';
+      document.getElementById('docNotes').value = d.notes || '';
+      Modal.open('doctorModal');
+    }
+
+    async function saveDoctor() {
+      const user = Auth.user;
+      const id = document.getElementById('doctorId').value;
+      const btn = document.getElementById('saveDoctorBtn');
+      const payload = {
+        name: document.getElementById('docName').value.trim(),
+        specialization: document.getElementById('docSpec').value,
+        category: document.getElementById('docCategory').value,
+        degree: document.getElementById('docDegree').value.trim(),
+        hospital: document.getElementById('docHospital').value.trim(),
+        address: document.getElementById('docAddress').value.trim(),
+        area: document.getElementById('docArea').value.trim(),
+        city: document.getElementById('docCity').value.trim(),
+        phone: document.getElementById('docPhone').value.trim(),
+        frequency: document.getElementById('docFrequency').value,
+        notes: document.getElementById('docNotes').value.trim(),
+        assignedMR: user.id,
+      };
+      if (!payload.name) { Toast.error('Doctor name is required'); return; }
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        if (id) {
+          await apiCall('/doctors', { method: 'PUT', body: JSON.stringify({ id, ...payload }) });
+          Toast.success('Doctor updated successfully');
+        } else {
+          await apiCall('/doctors', { method: 'POST', body: JSON.stringify(payload) });
+          Toast.success('Doctor added successfully');
+        }
+        Modal.close('doctorModal');
+        await loadDoctors();
+      } catch (err) {
+        Toast.error(err.message);
+      }
+      btn.disabled = false; btn.textContent = 'Save Doctor';
+    }
+  </script>
+</body>
+</html>
